@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Algoritmus v akci — výukový simulátor</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat build, easiest via CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+
+<!-- QR code generator -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<style>
+:root{
+  --bg: #0A0E16;
+  --bg-2: #0F1420;
+  --glass: rgba(255,255,255,0.06);
+  --glass-border: rgba(255,255,255,0.10);
+  --accent: #7C5CFF;
+  --accent-2: #34E4EA;
+  --warn: #FFB020;
+  --text: #E7ECF5;
+  --text-dim: #8892A6;
+  --danger: #FF5C7A;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+  font-family:'Inter',sans-serif; overflow-x:hidden;}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+button{font-family:inherit; cursor:pointer;}
+::-webkit-scrollbar{width:0; height:0;}
+
+.bg-field{
+  position:fixed; inset:0; z-index:-1;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(124,92,255,0.16), transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(52,228,234,0.12), transparent 45%),
+    var(--bg);
+}
+
+.screen{ min-height:100vh; width:100%; display:none; flex-direction:column; align-items:center; }
+.screen.active{ display:flex; }
+
+/* ---------- Glass card ---------- */
+.card{
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius:20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+}
+
+/* ---------- Landing ---------- */
+#screen-landing{ justify-content:center; padding:32px 20px; text-align:center; }
+.brand-mark{
+  width:56px; height:56px; margin:0 auto 18px;
+  border-radius:16px;
+  background:linear-gradient(135deg, var(--accent), var(--accent-2));
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px;
+}
+#screen-landing h1{ font-size:2rem; line-height:1.15; margin:0 0 8px; font-weight:700;}
+#screen-landing p.sub{ color:var(--text-dim); max-width:340px; margin:0 auto 34px; font-size:0.95rem;}
+.path-row{ display:flex; flex-direction:column; gap:14px; width:100%; max-width:340px; }
+.path-btn{
+  padding:18px 20px; border-radius:16px; border:1px solid var(--glass-border);
+  background:var(--glass); color:var(--text); text-align:left;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  transition:transform .15s ease, border-color .15s ease;
+}
+.path-btn:active{ transform:scale(0.97); }
+.path-btn .lbl{ font-weight:600; font-size:1.02rem; }
+.path-btn .desc{ font-size:0.78rem; color:var(--text-dim); margin-top:2px; }
+.path-btn.host{ border-color:rgba(124,92,255,0.5); }
+.path-btn.join{ border-color:rgba(52,228,234,0.5); }
+.arrow{ font-size:1.2rem; color:var(--accent-2); }
+
+/* Modal-style forms */
+.form-panel{ display:none; flex-direction:column; gap:12px; width:100%; max-width:340px; margin-top:18px; }
+.form-panel.active{ display:flex; }
+input[type=text], input[type=password], input[type=number]{
+  width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--glass-border);
+  background:rgba(255,255,255,0.04); color:var(--text); font-size:1rem; outline:none;
+}
+input:focus{ border-color:var(--accent); }
+.primary-btn{
+  padding:14px; border-radius:12px; border:none; font-weight:600; font-size:1rem;
+  background:linear-gradient(135deg, var(--accent), var(--accent-2)); color:#0A0E16;
+}
+.primary-btn:active{ transform:scale(0.98); }
+.ghost-btn{
+  padding:12px; border-radius:12px; border:1px solid var(--glass-border); background:transparent; color:var(--text-dim);
+}
+.error-txt{ color:var(--danger); font-size:0.85rem; min-height:16px; }
+
+/* ---------- Host Lobby ---------- */
+#screen-host{ padding:24px 18px 40px; align-items:stretch; gap:16px; max-width:480px; margin:0 auto; width:100%; }
+.room-code-card{ padding:22px; text-align:center; }
+.room-code{ font-size:2.4rem; font-weight:700; letter-spacing:6px; font-family:'Space Grotesk'; color:var(--accent-2); }
+.room-code-label{ font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;}
+#qrcode{ display:flex; justify-content:center; margin-top:14px; background:#fff; border-radius:12px; padding:10px; width:fit-content; margin-left:auto; margin-right:auto;}
+
+.settings-card{ padding:18px; display:flex; flex-direction:column; gap:14px; }
+.settings-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.settings-row label{ font-size:0.9rem; color:var(--text-dim); }
+select, input[type=range]{ accent-color:var(--accent); }
+select{ background:rgba(255,255,255,0.05); color:var(--text); border:1px solid var(--glass-border); border-radius:10px; padding:8px 10px; }
+
+.players-card{ padding:18px; }
+.players-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.players-header h3{ margin:0; font-size:1rem; }
+.player-count{ background:rgba(124,92,255,0.2); color:var(--accent-2); border-radius:20px; padding:2px 10px; font-size:0.8rem; }
+.player-list{ display:flex; flex-wrap:wrap; gap:8px; min-height:34px; }
+.player-chip{ background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); border-radius:20px; padding:6px 12px; font-size:0.85rem; }
+.empty-note{ color:var(--text-dim); font-size:0.85rem; }
+
+/* ---------- Feed ---------- */
+#screen-feed{ position:relative; height:100vh; width:100%; }
+.feed-scroller{ height:100vh; width:100%; overflow-y:scroll; scroll-snap-type:y mandatory; }
+.feed-item{ height:100vh; width:100%; scroll-snap-align:start; position:relative; display:flex; align-items:center; justify-content:center; background:#000;}
+.feed-item .yt-holder{ width:100%; height:100%; }
+.feed-item iframe{ width:100%; height:100%; border:0; pointer-events:none; }
+
+.feed-overlay{ position:absolute; inset:0; pointer-events:none; }
+.feed-topbar{ position:absolute; top:0; left:0; right:0; padding:16px 16px 0; display:flex; justify-content:space-between; align-items:center; pointer-events:auto; z-index:5;}
+.timer-pill{ background:rgba(0,0,0,0.45); backdrop-filter:blur(8px); border-radius:20px; padding:6px 14px; font-size:0.85rem; font-weight:600; border:1px solid rgba(255,255,255,0.15);}
+.progress-track{ position:absolute; top:0; left:0; right:0; height:3px; background:rgba(255,255,255,0.15); }
+.progress-fill{ height:100%; background:linear-gradient(90deg, var(--accent), var(--accent-2)); width:0%; transition:width .3s linear; }
+
+.action-rail{ position:absolute; right:12px; bottom:110px; display:flex; flex-direction:column; gap:22px; align-items:center; pointer-events:auto; z-index:5;}
+.action-btn{ width:50px; height:50px; border-radius:50%; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:#fff; transition:transform .12s ease;}
+.action-btn.liked{ color:var(--danger); border-color:var(--danger); }
+.action-btn.saved{ color:var(--warn); border-color:var(--warn); }
+.action-btn:active{ transform:scale(1.15); }
+.action-count{ font-size:0.68rem; color:var(--text-dim); margin-top:2px; text-align:center;}
+
+.swipe-hint{ position:absolute; bottom:26px; left:0; right:0; text-align:center; color:rgba(255,255,255,0.55); font-size:0.78rem; pointer-events:none; }
+
+/* ---------- Report ---------- */
+#screen-report{ padding:28px 18px 60px; align-items:stretch; max-width:520px; margin:0 auto; width:100%; gap:18px; }
+.archetype-card{ padding:26px; text-align:center; }
+.archetype-tag{ font-size:0.75rem; color:var(--text-dim); letter-spacing:1px; }
+.archetype-name{ font-size:1.5rem; font-weight:700; margin:6px 0 10px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.archetype-desc{ font-size:0.92rem; color:var(--text-dim); line-height:1.5; }
+
+.stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.stat-box{ padding:16px; text-align:left; }
+.stat-value{ font-size:1.5rem; font-weight:700; font-family:'Space Grotesk'; }
+.stat-label{ font-size:0.75rem; color:var(--text-dim); margin-top:2px; }
+
+.insight-card{ padding:18px; }
+.insight-card h3{ margin:0 0 10px; font-size:0.95rem; color:var(--accent-2); }
+.insight-line{ font-size:0.9rem; line-height:1.55; margin-bottom:8px; color:var(--text); }
+.chart-wrap{ padding:18px; }
+
+.host-report-list{ display:flex; flex-direction:column; gap:10px; }
+.student-row{ padding:14px 16px; display:flex; justify-content:space-between; align-items:center; }
+.student-row .name{ font-weight:600; }
+.student-row .arche{ font-size:0.8rem; color:var(--accent-2); }
+
+.bottom-note{ text-align:center; font-size:0.78rem; color:var(--text-dim); padding-top:10px; }
+
+.hidden{ display:none !important; }
+@media (min-width:820px){
+  #screen-feed .feed-item{ max-width:420px; margin:0 auto; }
+}
+</style>
+</head>
+<body>
+<div class="bg-field"></div>
+
+<!-- ================= LANDING ================= -->
+<div id="screen-landing" class="screen active">
+  <div class="brand-mark">👁️</div>
+  <h1>Algoritmus v&nbsp;akci</h1>
+  <p class="sub">Živá výuková simulace toho, jak sociální sítě sbírají chování, měří pozornost a profilují uživatele.</p>
+
+  <div class="path-row" id="path-row">
+    <button class="path-btn host" id="btn-show-host">
+      <div><div class="lbl">Spustit jako učitel</div><div class="desc">Vytvořit místnost a sledovat třídu</div></div>
+      <span class="arrow">›</span>
+    </button>
+    <button class="path-btn join" id="btn-show-join">
+      <div><div class="lbl">Připojit se jako student</div><div class="desc">Zadej jméno a kód místnosti</div></div>
+      <span class="arrow">›</span>
+    </button>
+  </div>
+
+  <div class="form-panel" id="panel-host">
+    <input type="password" id="input-passcode" placeholder="Kód učitele" inputmode="numeric">
+    <div class="error-txt" id="err-host"></div>
+    <button class="primary-btn" id="btn-create-room">Vytvořit místnost</button>
+    <button class="ghost-btn" id="btn-back-1">Zpět</button>
+  </div>
+
+  <div class="form-panel" id="panel-join">
+    <input type="text" id="input-nickname" placeholder="Přezdívka" maxlength="18">
+    <input type="text" id="input-roomcode" placeholder="Kód místnosti" maxlength="6" style="text-transform:uppercase">
+    <div class="error-txt" id="err-join"></div>
+    <button class="primary-btn" id="btn-join-room">Připojit se</button>
+    <button class="ghost-btn" id="btn-back-2">Zpět</button>
+  </div>
+</div>
+
+<!-- ================= HOST LOBBY ================= -->
+<div id="screen-host" class="screen">
+  <div class="card room-code-card">
+    <div class="room-code-label">Kód místnosti</div>
+    <div class="room-code" id="display-room-code">——</div>
+    <div id="qrcode"></div>
+  </div>
+
+  <div class="card settings-card">
+    <div class="settings-row">
+      <label>Motiv rozhraní</label>
+      <select id="select-theme">
+        <option value="violet">Violet / Cyan</option>
+        <option value="crimson">Crimson / Amber</option>
+        <option value="emerald">Emerald / Ice</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label>Délka relace: <span id="timer-display">10 min</span></label>
+      <input type="range" id="range-timer" min="1" max="20" value="10">
+    </div>
+    <button class="primary-btn" id="btn-start-session">Spustit relaci pro všechny</button>
+    <button class="ghost-btn" id="btn-end-session" style="display:none;">Ukončit relaci nyní</button>
+  </div>
+
+  <div class="card players-card">
+    <div class="players-header">
+      <h3>Připojení studenti</h3>
+      <span class="player-count" id="player-count">0</span>
+    </div>
+    <div class="player-list" id="player-list">
+      <span class="empty-note">Zatím se nikdo nepřipojil…</span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= STUDENT WAITING ================= -->
+<div id="screen-waiting" class="screen" style="justify-content:center; text-align:center; padding:30px;">
+  <div class="brand-mark">⏳</div>
+  <h2>Jsi v místnosti <span id="waiting-room-code" style="color:var(--accent-2)"></span></h2>
+  <p style="color:var(--text-dim);">Čekej, až učitel spustí relaci…</p>
+</div>
+
+<!-- ================= FEED ================= -->
+<div id="screen-feed" class="screen">
+  <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+  <div class="feed-topbar">
+    <div class="timer-pill" id="timer-pill">10:00</div>
+  </div>
+  <div class="feed-scroller" id="feed-scroller"></div>
+</div>
+
+<!-- ================= REPORT ================= -->
+<div id="screen-report" class="screen"></div>
+
+<script>
+/* =========================================================
+   1. FIREBASE CONFIG — VLOŽ SEM SVOJE ÚDAJE Z FIREBASE CONSOLE
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyB4BgKp4GfMXdLcfTGihH0JeLDEQm3PYy0",
+  authDomain: "scrollovani.firebaseapp.com",
+  projectId: "scrollovani",
+  storageBucket: "scrollovani.firebasestorage.app",
+  messagingSenderId: "973696458520",
+  appId: "1:973696458520:web:ce1faaea480b7a04bf886d",
+  measurementId: "G-0ED5038CNY"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* =========================================================
+   2. GLOBAL STATE
+   ========================================================= */
+const ADMIN_PASSCODE = "4321";
+let ROLE = null;          // 'host' | 'student'
+let ROOM_CODE = null;
+let NICKNAME = null;
+let studentId = null;
+let sessionTimerHandle = null;
+let sessionEndsAt = null;
+
+/* Curated placeholder Shorts video IDs — swap with your own vetted list */
+const SHORTS_PLAYLIST = [
+  { id: "iP5xCwvL7Vg", category: "high-stimulation" },
+  { id: "M7lc1UVf-VE", category: "informational" },
+  { id: "aqz-KE-bpKQ", category: "high-stimulation" },
+  { id: "ScMzIvxBSi4", category: "calm" },
+  { id: "eY52Zsg-KVI", category: "high-stimulation" },
+  { id: "hT_nvWreIhg", category: "informational" }
+];
+
+/* Per-student local telemetry buffer before pushing to Firebase */
+let telemetry = {}; // videoId -> {watchMs, retentionPct, reversals, likes, saves, reposts, category}
+let ytPlayers = {}; // videoId -> YT.Player
+let activeVideoIndex = 0;
+let videoEnterTime = {};
+
+/* =========================================================
+   3. SCREEN NAV HELPERS
+   ========================================================= */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function roomRef(path=''){ return db.ref('rooms/' + ROOM_CODE + (path ? '/' + path : '')); }
+
+/* =========================================================
+   4. LANDING SCREEN LOGIC
+   ========================================================= */
+document.getElementById('btn-show-host').onclick = ()=>{
+  document.getElementById('path-row').classList.add('hidden');
+  document.getElementById('panel-host').classList.add('active');
+};
+document.getElementById('btn-show-join').onclick = ()=>{
+  document.getElementById('path-row').classList.add('hidden');
+  document.getElementById('panel-join').classList.add('active');
+};
+document.getElementById('btn-back-1').onclick = ()=>{ resetLanding(); };
+document.getElementById('btn-back-2').onclick = ()=>{ resetLanding(); };
+function resetLanding(){
+  document.getElementById('path-row').classList.remove('hidden');
+  document.getElementById('panel-host').classList.remove('active');
+  document.getElementById('panel-join').classList.remove('active');
+  document.getElementById('err-host').textContent='';
+  document.getElementById('err-join').textContent='';
+}
+
+function genRoomCode(){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out='';
+  for(let i=0;i<5;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
+document.getElementById('btn-create-room').onclick = async ()=>{
+  const code = document.getElementById('input-passcode').value.trim();
+  if(code !== ADMIN_PASSCODE){
+    document.getElementById('err-host').textContent = 'Nesprávný kód učitele.';
+    return;
+  }
+  ROLE = 'host';
+  ROOM_CODE = genRoomCode();
+  await roomRef().set({
+    createdAt: Date.now(),
+    status: 'lobby',
+    theme: 'violet',
+    timerMinutes: 10,
+    students: {}
+  });
+  document.getElementById('display-room-code').textContent = ROOM_CODE;
+  const joinUrl = location.href.split('#')[0] + '#join=' + ROOM_CODE;
+  document.getElementById('qrcode').innerHTML = '';
+  new QRCode(document.getElementById('qrcode'), { text: joinUrl, width:160, height:160 });
+  showScreen('screen-host');
+  listenToPlayers();
+};
+
+document.getElementById('btn-join-room').onclick = async ()=>{
+  const nick = document.getElementById('input-nickname').value.trim();
+  const code = document.getElementById('input-roomcode').value.trim().toUpperCase();
+  const errEl = document.getElementById('err-join');
+  if(!nick || !code){ errEl.textContent = 'Vyplň přezdívku i kód místnosti.'; return; }
+  const snap = await db.ref('rooms/'+code).get();
+  if(!snap.exists()){ errEl.textContent = 'Místnost nenalezena.'; return; }
+  ROLE = 'student';
+  ROOM_CODE = code;
+  NICKNAME = nick;
+  studentId = 'stu_' + Math.random().toString(36).slice(2,9);
+  await roomRef('students/'+studentId).set({ name: nick, joinedAt: Date.now() });
+  document.getElementById('waiting-room-code').textContent = ROOM_CODE;
+  showScreen('screen-waiting');
+  listenToRoomStatus();
+};
+
+/* Support #join=CODE deep link from QR scan */
+window.addEventListener('load', ()=>{
+  const m = location.hash.match(/join=([A-Z0-9]+)/i);
+  if(m){
+    document.getElementById('btn-show-join').click();
+    document.getElementById('input-roomcode').value = m[1].toUpperCase();
+  }
+});
+
+/* =========================================================
+   5. HOST LOBBY LOGIC
+   ========================================================= */
+function listenToPlayers(){
+  roomRef('students').on('value', snap=>{
+    const data = snap.val() || {};
+    const names = Object.values(data);
+    document.getElementById('player-count').textContent = names.length;
+    const listEl = document.getElementById('player-list');
+    if(names.length === 0){
+      listEl.innerHTML = '<span class="empty-note">Zatím se nikdo nepřipojil…</span>';
+    } else {
+      listEl.innerHTML = names.map(n=>`<span class="player-chip">${escapeHtml(n.name)}</span>`).join('');
+    }
+  });
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+document.getElementById('select-theme').onchange = (e)=>{
+  roomRef().update({ theme: e.target.value });
+};
+document.getElementById('range-timer').oninput = (e)=>{
+  document.getElementById('timer-display').textContent = e.target.value + ' min';
+};
+document.getElementById('range-timer').onchange = (e)=>{
+  roomRef().update({ timerMinutes: parseInt(e.target.value) });
+};
+
+document.getElementById('btn-start-session').onclick = async ()=>{
+  const minutes = parseInt(document.getElementById('range-timer').value);
+  const endsAt = Date.now() + minutes*60000;
+  await roomRef().update({ status:'running', sessionEndsAt: endsAt, playlist: SHORTS_PLAYLIST });
+  document.getElementById('btn-start-session').style.display='none';
+  document.getElementById('btn-end-session').style.display='block';
+};
+document.getElementById('btn-end-session').onclick = async ()=>{
+  await roomRef().update({ status:'ended' });
+};
+
+/* Host listens for status change to 'ended' to build class report */
+function listenHostReport(){
+  roomRef('status').on('value', snap=>{
+    if(snap.val() === 'ended'){
+      buildHostReport();
+    }
+  });
+}
+
+/* =========================================================
+   6. STUDENT: WAIT FOR SESSION START
+   ========================================================= */
+function listenToRoomStatus(){
+  roomRef().on('value', snap=>{
+    const room = snap.val();
+    if(!room) return;
+    if(room.status === 'running' && !sessionEndsAt){
+      sessionEndsAt = room.sessionEndsAt;
+      startFeed(room.playlist || SHORTS_PLAYLIST);
+    }
+    if(room.status === 'ended'){
+      finishSessionForStudent();
+    }
+  });
+}
+
+/* =========================================================
+   7. FEED / YOUTUBE IFRAME API
+   ========================================================= */
+let ytApiReady = false;
+function loadYT(){
+  return new Promise(resolve=>{
+    if(window.YT && window.YT.Player){ ytApiReady = true; resolve(); return; }
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+    window.onYouTubeIframeAPIReady = ()=>{ ytApiReady = true; resolve(); };
+  });
+}
+
+async function startFeed(playlist){
+  showScreen('screen-feed');
+  await loadYT();
+  const scroller = document.getElementById('feed-scroller');
+  scroller.innerHTML = '';
+  playlist.forEach((v, idx)=>{
+    telemetry[v.id] = { watchMs:0, retentionPct:0, reversals:0, likes:0, saves:0, reposts:0, category:v.category, maxIndexSeen:idx };
+    const item = document.createElement('div');
+    item.className = 'feed-item';
+    item.dataset.videoId = v.id;
+    item.dataset.index = idx;
+    item.innerHTML = `
+      <div class="yt-holder" id="yt-${v.id}"></div>
+      <div class="feed-overlay">
+        <div class="action-rail">
+          <div style="text-align:center;">
+            <div class="action-btn like-btn" data-vid="${v.id}">❤</div>
+            <div class="action-count" id="cnt-like-${v.id}">0</div>
+          </div>
+          <div style="text-align:center;">
+            <div class="action-btn save-btn" data-vid="${v.id}">🔖</div>
+            <div class="action-count" id="cnt-save-${v.id}">0</div>
+          </div>
+          <div style="text-align:center;">
+            <div class="action-btn repost-btn" data-vid="${v.id}">↻</div>
+            <div class="action-count" id="cnt-repost-${v.id}">0</div>
+          </div>
+        </div>
+        ${idx===0 ? '<div class="swipe-hint">↑ swipuj pro další video</div>' : ''}
+      </div>`;
+    scroller.appendChild(item);
+  });
+
+  // init YT players
+  playlist.forEach(v=>{
+    ytPlayers[v.id] = new YT.Player('yt-'+v.id, {
+      videoId: v.id,
+      playerVars: { controls:0, modestbranding:1, rel:0, playsinline:1, mute:0 },
+      events: {
+        'onReady': ()=>{ if(v.id === playlist[0].id) ytPlayers[v.id].playVideo(); }
+      }
+    });
+  });
+
+  // click handlers for like/save/repost
+  scroller.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.action-btn');
+    if(!btn) return;
+    const vid = btn.dataset.vid;
+    if(btn.classList.contains('like-btn')){ telemetry[vid].likes++; btn.classList.toggle('liked'); document.getElementById('cnt-like-'+vid).textContent = telemetry[vid].likes; }
+    if(btn.classList.contains('save-btn')){ telemetry[vid].saves++; btn.classList.toggle('saved'); document.getElementById('cnt-save-'+vid).textContent = telemetry[vid].saves; }
+    if(btn.classList.contains('repost-btn')){ telemetry[vid].reposts++; document.getElementById('cnt-repost-'+vid).textContent = telemetry[vid].reposts; }
+    pushTelemetry(vid);
+  });
+
+  // scroll tracking -> play/pause active video + watch time + reversal detection
+  let lastIndex = 0;
+  videoEnterTime[playlist[0].id] = Date.now();
+  scroller.addEventListener('scroll', debounce(()=>{
+    const items = [...scroller.querySelectorAll('.feed-item')];
+    const scrollTop = scroller.scrollTop;
+    const h = scroller.clientHeight;
+    const currentIdx = Math.round(scrollTop / h);
+    if(currentIdx === lastIndex) return;
+
+    const prevItem = items[lastIndex];
+    const prevId = prevItem.dataset.videoId;
+    const dwell = Date.now() - (videoEnterTime[prevId] || Date.now());
+    telemetry[prevId].watchMs += dwell;
+    if(ytPlayers[prevId]) ytPlayers[prevId].pauseVideo();
+
+    if(currentIdx < lastIndex) telemetry[prevId].reversals += 0; // leaving via reverse counted on entry below
+    const curItem = items[currentIdx];
+    const curId = curItem.dataset.videoId;
+    if(currentIdx < telemetry[curId].maxIndexSeen === false && currentIdx < lastIndex){
+      telemetry[curId].reversals++;
+    }
+    if(currentIdx < lastIndex){ telemetry[curId].reversals++; } // scrolled backward to rewatch
+
+    videoEnterTime[curId] = Date.now();
+    if(ytPlayers[curId]) ytPlayers[curId].seekTo(0), ytPlayers[curId].playVideo();
+    pushTelemetry(prevId);
+    lastIndex = currentIdx;
+  }, 120));
+
+  // countdown + progress
+  runSessionTimer();
+}
+
+function pushTelemetry(vid){
+  if(!ROOM_CODE || !studentId) return;
+  const t = telemetry[vid];
+  const totalMs = 15000; // assumed avg short length for retention calc (placeholder)
+  t.retentionPct = Math.min(100, Math.round((t.watchMs/totalMs)*100));
+  roomRef(`students/${studentId}/telemetry/${vid}`).set(t);
+}
+
+function runSessionTimer(){
+  clearInterval(sessionTimerHandle);
+  sessionTimerHandle = setInterval(()=>{
+    const remaining = sessionEndsAt - Date.now();
+    if(remaining <= 0){
+      clearInterval(sessionTimerHandle);
+      finishSessionForStudent();
+      return;
+    }
+    const mins = Math.floor(remaining/60000);
+    const secs = Math.floor((remaining%60000)/1000);
+    document.getElementById('timer-pill').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+    const totalDuration = sessionEndsAt - (sessionEndsAt - (document.getElementById('range-timer')?.value*60000 || 600000));
+  }, 500);
+}
+
+function debounce(fn, ms){
+  let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
+}
+
+/* =========================================================
+   8. END OF SESSION → BUILD STUDENT REPORT
+   ========================================================= */
+async function finishSessionForStudent(){
+  if(ROLE !== 'student') return;
+  Object.keys(ytPlayers).forEach(vid=>{ try{ ytPlayers[vid].pauseVideo(); }catch(e){} });
+  // final flush
+  Object.keys(telemetry).forEach(vid=>pushTelemetry(vid));
+
+  const videos = Object.entries(telemetry);
+  const totalWatched = videos.length;
+  const avgAttention = videos.reduce((a,[,t])=>a+t.watchMs,0)/1000/Math.max(totalWatched,1);
+  const totalLikes = videos.reduce((a,[,t])=>a+t.likes,0);
+  const totalSaves = videos.reduce((a,[,t])=>a+t.saves,0);
+  const totalReposts = videos.reduce((a,[,t])=>a+t.reposts,0);
+  const reversals = videos.reduce((a,[,t])=>a+t.reversals,0);
+  const highStimMs = videos.filter(([,t])=>t.category==='high-stimulation').reduce((a,[,t])=>a+t.watchMs,0);
+  const calmMs = videos.filter(([,t])=>t.category!=='high-stimulation').reduce((a,[,t])=>a+t.watchMs,0);
+  const interactionRatio = ((totalLikes+totalSaves+totalReposts) / Math.max(totalWatched,1)).toFixed(2);
+  const engagementIndex = Math.min(100, Math.round((avgAttention*4) + (totalLikes+totalSaves+totalReposts)*6 + reversals*8));
+
+  const archetype = pickArchetype({avgAttention, interactionRatio: parseFloat(interactionRatio), reversals, highStimMs, calmMs, engagementIndex});
+
+  const summary = {
+    name: NICKNAME, totalWatched, avgAttention: Math.round(avgAttention),
+    totalLikes, totalSaves, totalReposts, reversals, interactionRatio,
+    engagementIndex, archetype: archetype.name, highStimMs, calmMs
+  };
+  await roomRef('students/'+studentId+'/summary').set(summary);
+
+  renderStudentReport(summary, archetype);
+  showScreen('screen-report');
+}
+
+function pickArchetype({avgAttention, interactionRatio, reversals, highStimMs, calmMs, engagementIndex}){
+  if(highStimMs > calmMs*1.5 && engagementIndex > 60){
+    return { name:"Dopamine Chaser", desc:"Tvá pozornost šla nejsilněji k rychlým, vysoce stimulačním klipům. Přesně takové chování algoritmy odměňují nekonečným posouváním." };
+  }
+  if(reversals >= 3){
+    return { name:"Nostalgický přehrávač", desc:"Často ses vracel/a k předchozím videím. Algoritmus si toho všímá a nabízí ti podobný obsah znovu a znovu." };
+  }
+  if(avgAttention < 3){
+    return { name:"Impulzivní skimmer", desc:"Rychle jsi přeskakoval/a mezi videi. Systém se to naučí a bude ti servírovat stále kratší a intenzivnější podněty." };
+  }
+  if(interactionRatio > 0.8){
+    return { name:"Aktivní angažér", desc:"Hodně jsi lajkoval/a a ukládal/a obsah. Tvoje interakce jsou pro algoritmus silným signálem o tvých zájmech i emocích." };
+  }
+  return { name:"Vyvážený divák", desc:"Tvé chování bylo relativně vyrovnané — ale i tak si algoritmus buduje profil na základě každé sekundy tvé pozornosti." };
+}
+
+function renderStudentReport(s, archetype){
+  const el = document.getElementById('screen-report');
+  el.innerHTML = `
+    <div class="card archetype-card">
+      <div class="archetype-tag">TVŮJ DIGITÁLNÍ OTISK</div>
+      <div class="archetype-name">${archetype.name}</div>
+      <div class="archetype-desc">${archetype.desc}</div>
+    </div>
+    <div class="stat-grid">
+      <div class="card stat-box"><div class="stat-value">${s.totalWatched}</div><div class="stat-label">Zhlédnutá videa</div></div>
+      <div class="card stat-box"><div class="stat-value">${s.avgAttention}s</div><div class="stat-label">Průměrná pozornost</div></div>
+      <div class="card stat-box"><div class="stat-value">${s.interactionRatio}</div><div class="stat-label">Poměr interakcí</div></div>
+      <div class="card stat-box"><div class="stat-value">${s.engagementIndex}</div><div class="stat-label">Index zapojení</div></div>
+    </div>
+    <div class="card insight-card">
+      <h3>Co se algoritmus naučil</h3>
+      <div class="insight-line">${insightSentence(s)}</div>
+      <div class="insight-line">Celkem ${s.totalLikes} lajků, ${s.totalSaves} uložení a ${s.totalReposts} sdílení — každá interakce zpřesňuje tvůj profil zájmů.</div>
+      <div class="insight-line">${s.reversals} vrácení se k videu ukazuje, co tě opravdu zaujalo natolik, že ses vrátil/a.</div>
+    </div>
+    <div class="card chart-wrap"><canvas id="studentChart" height="180"></canvas></div>
+    <p class="bottom-note">Toto je vzdělávací simulace pro výuku digitální gramotnosti — žádná data neopouštějí tuto místnost mimo účely hodiny.</p>
+  `;
+  const ctx = document.getElementById('studentChart');
+  new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels:['Vysoce stimulační obsah','Klidnější obsah'],
+      datasets:[{ data:[s.highStimMs, s.calmMs], backgroundColor:['#7C5CFF','#34E4EA'], borderWidth:0 }]
+    },
+    options:{ plugins:{ legend:{ labels:{ color:'#E7ECF5' } } } }
+  });
+}
+
+function insightSentence(s){
+  const highPct = Math.round((s.highStimMs/(s.highStimMs+s.calmMs+1))*100);
+  if(highPct > 55){
+    return `Strávil/a jsi ${highPct}% svého času u vysoce stimulačního obsahu, což signalizuje vyšší náchylnost k nekonečnému scrollování.`;
+  }
+  return `Tvůj čas byl rozložený vyrovnaněji (${highPct}% u intenzivního obsahu), což ukazuje větší odolnost vůči algoritmickým smyčkám.`;
+}
+
+/* =========================================================
+   9. HOST: CLASS-WIDE DEBRIEF DASHBOARD
+   ========================================================= */
+async function buildHostReport(){
+  const snap = await roomRef('students').get();
+  const students = snap.val() || {};
+  const rows = Object.values(students).filter(s=>s.summary).map(s=>s.summary);
+
+  showScreen('screen-report');
+  const el = document.getElementById('screen-report');
+  el.innerHTML = `
+    <div class="card" style="padding:20px; text-align:center;">
+      <h2 style="margin:0 0 4px;">Přehled třídy</h2>
+      <p style="color:var(--text-dim); margin:0; font-size:0.85rem;">${rows.length} studentů dokončilo relaci</p>
+    </div>
+    <div class="card chart-wrap"><canvas id="classChart" height="200"></canvas></div>
+    <div class="host-report-list" id="host-report-list"></div>
+  `;
+  const listEl = document.getElementById('host-report-list');
+  if(rows.length === 0){
+    listEl.innerHTML = '<p class="empty-note" style="text-align:center;">Zatím nikdo nedokončil relaci.</p>';
+  } else {
+    listEl.innerHTML = rows.map(r=>`
+      <div class="card student-row">
+        <div><div class="name">${escapeHtml(r.name)}</div><div class="arche">${r.archetype}</div></div>
+        <div style="text-align:right;">
+          <div style="font-weight:700;">${r.engagementIndex}</div>
+          <div style="font-size:0.7rem; color:var(--text-dim);">index zapojení</div>
+        </div>
+      </div>`).join('');
+
+    const ctx = document.getElementById('classChart');
+    new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: rows.map(r=>r.name),
+        datasets:[{ label:'Index zapojení', data: rows.map(r=>r.engagementIndex), backgroundColor:'#7C5CFF' }]
+      },
+      options:{
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ ticks:{ color:'#8892A6' } },
+          y:{ ticks:{ color:'#8892A6' }, beginAtZero:true, max:100 }
+        }
+      }
+    });
+  }
+}
+
+listenHostReport();
+</script>
+</body>
+</html>
