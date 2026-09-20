@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Algo Lab — See How the Algorithm Reads You</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<style>
+:root{
+  --bg:#0A0E16; --bg-2:#0F1420;
+  --glass:rgba(255,255,255,0.06); --glass-border:rgba(255,255,255,0.10);
+  --accent:#7C5CFF; --accent-2:#34E4EA;
+  --warn:#FFB020; --text:#E7ECF5; --text-dim:#8892A6; --danger:#FF5C7A;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;min-height:100%;background:var(--bg);color:var(--text);
+  font-family:'Inter',system-ui,sans-serif;overflow-x:hidden;}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif;}
+button{font-family:inherit;cursor:pointer;}
+.bg-field{position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(circle at 15% 20%, rgba(124,92,255,.16), transparent 40%),
+             radial-gradient(circle at 85% 75%, rgba(52,228,234,.12), transparent 45%), var(--bg);}
+.screen{min-height:100vh;min-height:100dvh;width:100%;display:none;flex-direction:column;align-items:center;}
+.screen.active{display:flex;}
+.card{background:var(--glass);border:1px solid var(--glass-border);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.35);}
+
+/* Landing */
+#screen-landing{justify-content:center;padding:32px 20px;text-align:center;}
+.brand-mark{width:56px;height:56px;margin:0 auto 18px;border-radius:16px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  display:flex;align-items:center;justify-content:center;font-size:26px;}
+#screen-landing h1{font-size:2rem;line-height:1.15;margin:0 0 8px;font-weight:700;}
+#screen-landing p.sub{color:var(--text-dim);max-width:360px;margin:0 auto 34px;font-size:.95rem;line-height:1.5;}
+.path-row{display:flex;flex-direction:column;gap:14px;width:100%;max-width:360px;}
+.path-btn{padding:18px 20px;border-radius:16px;border:1px solid var(--glass-border);
+  background:var(--glass);color:var(--text);text-align:left;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;transition:transform .15s;}
+.path-btn:active{transform:scale(.97);}
+.path-btn .lbl{font-weight:600;font-size:1.02rem;}
+.path-btn .desc{font-size:.78rem;color:var(--text-dim);margin-top:2px;}
+.path-btn.host{border-color:rgba(124,92,255,.5);}
+.path-btn.join{border-color:rgba(52,228,234,.5);}
+.arrow{font-size:1.2rem;color:var(--accent-2);}
+.form-panel{display:none;flex-direction:column;gap:12px;width:100%;max-width:360px;margin-top:18px;}
+.form-panel.active{display:flex;}
+input[type=text],input[type=password]{width:100%;padding:14px 16px;border-radius:12px;
+  border:1px solid var(--glass-border);background:rgba(255,255,255,.04);
+  color:var(--text);font-size:1rem;outline:none;}
+input:focus{border-color:var(--accent);}
+.primary-btn{padding:14px;border-radius:12px;border:none;font-weight:600;font-size:1rem;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#0A0E16;}
+.primary-btn:disabled{opacity:.5;}
+.ghost-btn{padding:12px;border-radius:12px;border:1px solid var(--glass-border);
+  background:transparent;color:var(--text-dim);}
+.error-txt{color:var(--danger);font-size:.85rem;min-height:16px;}
+
+/* Consent */
+#screen-consent{padding:28px 18px 50px;max-width:520px;margin:0 auto;justify-content:center;}
+.consent-body{padding:22px;}
+.consent-body h2{margin:0 0 6px;font-size:1.4rem;}
+.consent-body .lead{color:var(--text-dim);font-size:.9rem;line-height:1.55;margin-bottom:16px;}
+.consent-list{background:rgba(0,0,0,.25);border-radius:14px;padding:16px 16px 16px 18px;
+  font-size:.86rem;color:var(--text-dim);line-height:1.6;}
+.consent-list ul{margin:8px 0 0;padding-left:18px;}
+.consent-list li{margin-bottom:5px;}
+.consent-check{display:flex;gap:11px;align-items:flex-start;margin:18px 0 6px;font-size:.88rem;line-height:1.45;}
+.consent-check input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent-2);flex-shrink:0;}
+
+/* Host lobby */
+#screen-host{padding:24px 18px 48px;align-items:stretch;gap:16px;max-width:520px;margin:0 auto;width:100%;}
+.room-code-card{padding:22px;text-align:center;}
+.room-code{font-size:2.4rem;font-weight:700;letter-spacing:6px;
+  font-family:'Space Grotesk';color:var(--accent-2);}
+.room-code-label{font-size:.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+#qrcode{display:flex;justify-content:center;margin:14px auto 0;background:#fff;
+  border-radius:12px;padding:10px;width:fit-content;}
+.join-hint{font-size:.75rem;color:var(--text-dim);margin-top:10px;word-break:break-all;}
+.settings-card{padding:18px;display:flex;flex-direction:column;gap:15px;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.settings-row label{font-size:.9rem;color:var(--text-dim);}
+select{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--glass-border);
+  border-radius:10px;padding:8px 10px;}
+input[type=range]{accent-color:var(--accent);flex:1;max-width:170px;}
+.players-card{padding:18px;}
+.players-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.players-header h3{margin:0;font-size:1rem;}
+.player-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.player-chip{padding:7px 13px;border-radius:999px;background:rgba(52,228,234,.12);
+  border:1px solid rgba(52,228,234,.35);font-size:.84rem;}
+.empty-note{color:var(--text-dim);font-size:.85rem;}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent-2);
+  display:inline-block;margin-right:6px;animation:pulse 1.6s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+/* Waiting */
+#screen-waiting{justify-content:center;padding:32px 20px;text-align:center;}
+.spinner{width:52px;height:52px;border-radius:50%;border:3px solid rgba(255,255,255,.12);
+  border-top-color:var(--accent-2);animation:spin 1s linear infinite;margin:0 auto 22px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Feed */
+#screen-feed{padding:0;}
+.feed-wrap{position:relative;width:100%;max-width:460px;margin:0 auto;
+  height:100vh;height:100dvh;overflow:hidden;}
+.feed-scroller{height:100%;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
+  scrollbar-width:none;}
+.feed-scroller::-webkit-scrollbar{display:none;}
+.feed-item{height:100%;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
+  position:relative;background:#000;overflow:hidden;}
+.yt-holder{position:absolute;inset:0;}
+.yt-holder iframe{width:100%;height:100%;border:0;}
+.tap-shield{position:absolute;inset:0;z-index:2;}
+.feed-overlay{position:absolute;inset:0;z-index:3;pointer-events:none;}
+.meta-strip{position:absolute;left:14px;bottom:26px;right:80px;pointer-events:none;}
+.cat-tag{display:inline-block;font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;
+  font-weight:700;color:var(--accent-2);background:rgba(10,14,22,.65);
+  padding:4px 10px;border-radius:999px;backdrop-filter:blur(6px);}
+.meta-title{margin-top:8px;font-size:.95rem;font-weight:600;
+  text-shadow:0 2px 12px rgba(0,0,0,.8);line-height:1.3;}
+.action-rail{position:absolute;right:12px;bottom:26px;display:flex;flex-direction:column;
+  gap:18px;pointer-events:auto;}
+.action-btn{width:48px;height:48px;border-radius:50%;background:rgba(10,14,22,.6);
+  border:1px solid var(--glass-border);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;font-size:1.3rem;
+  transition:transform .12s;}
+.action-btn:active{transform:scale(.85);}
+.action-btn.liked{color:var(--danger);border-color:var(--danger);}
+.action-btn.saved{color:var(--warn);border-color:var(--warn);}
+.action-btn.reposted{color:var(--accent-2);border-color:var(--accent-2);}
+.action-count{font-size:.68rem;color:var(--text-dim);text-align:center;margin-top:3px;}
+.feed-topbar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;
+  justify-content:center;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;pointer-events:none;}
+.timer-pill{background:rgba(10,14,22,.72);border:1px solid var(--glass-border);
+  backdrop-filter:blur(10px);padding:7px 17px;border-radius:999px;
+  font-weight:600;font-size:.9rem;color:var(--accent-2);}
+.progress-track{position:absolute;top:0;left:0;right:0;height:3px;
+  background:rgba(255,255,255,.08);z-index:6;}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  transition:width .5s linear;}
+.swipe-hint{position:absolute;left:0;right:0;bottom:110px;text-align:center;
+  font-size:.82rem;color:rgba(255,255,255,.8);animation:bob 1.8s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+
+/* Report */
+#screen-report{padding:26px 16px 60px;gap:14px;max-width:560px;margin:0 auto;width:100%;}
+.archetype-card{padding:26px 22px;text-align:center;
+  background:linear-gradient(145deg,rgba(124,92,255,.18),rgba(52,228,234,.10));
+  border:1px solid rgba(124,92,255,.4);}
+.archetype-tag{font-size:.7rem;letter-spacing:.14em;color:var(--accent-2);font-weight:700;}
+.archetype-name{font-family:'Space Grotesk';font-size:1.85rem;font-weight:700;margin:8px 0 10px;}
+.archetype-desc{font-size:.9rem;color:var(--text-dim);line-height:1.55;}
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.stat-box{padding:16px;text-align:center;}
+.stat-value{font-family:'Space Grotesk';font-size:1.65rem;font-weight:700;color:var(--accent-2);}
+.stat-label{font-size:.72rem;color:var(--text-dim);margin-top:3px;}
+.insight-card{padding:20px;}
+.insight-card h3{margin:0 0 12px;font-size:1rem;}
+.insight-line{font-size:.88rem;line-height:1.55;color:var(--text-dim);
+  padding-left:14px;border-left:2px solid var(--accent);margin-bottom:11px;}
+.insight-line b{color:var(--text);}
+.chart-wrap{padding:18px;}
+.debrief{padding:20px;font-size:.87rem;line-height:1.6;color:var(--text-dim);
+  background:linear-gradient(145deg,rgba(124,92,255,.07),rgba(52,228,234,.05));}
+.debrief h3{color:var(--text);margin:0 0 10px;font-size:1rem;}
+.student-row{padding:14px 16px;display:flex;justify-content:space-between;
+  align-items:center;margin-bottom:9px;}
+.student-row .name{font-weight:600;font-size:.95rem;}
+.student-row .arche{font-size:.75rem;color:var(--accent-2);margin-top:2px;}
+.bottom-note{font-size:.74rem;color:var(--text-dim);text-align:center;
+  max-width:420px;margin:8px auto 0;line-height:1.5;}
+.warn-banner{background:rgba(255,176,32,.12);border:1px solid rgba(255,176,32,.4);
+  color:var(--warn);padding:12px 14px;border-radius:12px;font-size:.82rem;
+  line-height:1.45;margin:0 auto;max-width:460px;}
+@media(min-width:620px){.stat-grid{grid-template-columns:repeat(4,1fr);}}
+</style>
+</head>
+<body>
+<div class="bg-field"></div>
+
+<!-- ============ LANDING ============ -->
+<div id="screen-landing" class="screen active">
+  <div class="brand-mark">◎</div>
+  <h1>Algo Lab</h1>
+  <p class="sub">A classroom experiment. Scroll a real short-video feed, and find out exactly what a recommendation algorithm learns about you while you do it.</p>
+  <div class="path-row" id="path-row">
+    <button class="path-btn host" id="btn-show-host">
+      <span><span class="lbl">Host Session</span><span class="desc">For the teacher — creates the room</span></span>
+      <span class="arrow">→</span>
+    </button>
+    <button class="path-btn join" id="btn-show-join">
+      <span><span class="lbl">Join Session</span><span class="desc">For students — needs a room code</span></span>
+      <span class="arrow">→</span>
+    </button>
+  </div>
+
+  <div class="form-panel" id="panel-host">
+    <input type="password" id="input-passcode" placeholder="Teacher passcode" inputmode="numeric" maxlength="8">
+    <div class="error-txt" id="err-host"></div>
+    <button class="primary-btn" id="btn-create-room">Create Room</button>
+    <button class="ghost-btn" id="btn-back-1">Back</button>
+  </div>
+
+  <div class="form-panel" id="panel-join">
+    <input type="text" id="input-nickname" placeholder="Your nickname" maxlength="18">
+    <input type="text" id="input-roomcode" placeholder="Room code" maxlength="6" style="text-transform:uppercase">
+    <div class="error-txt" id="err-join"></div>
+    <button class="primary-btn" id="btn-join-room">Continue</button>
+    <button class="ghost-btn" id="btn-back-2">Back</button>
+  </div>
+</div>
+
+<!-- ============ CONSENT ============ -->
+<div id="screen-consent" class="screen">
+  <div class="card consent-body">
+    <h2>Before you start</h2>
+    <p class="lead">This is an educational simulation of what platforms like TikTok, Instagram and YouTube measure in the background every time you scroll. Nothing here is hidden from you — here is exactly what gets recorded:</p>
+    <div class="consent-list">
+      <b style="color:var(--text)">While you scroll, this app records:</b>
+      <ul>
+        <li>How long you watch each video, and which category it belongs to</li>
+        <li>How fast you skip, and how much of each video you actually finish</li>
+        <li>Every like, save and repost you tap</li>
+        <li>Whether you scroll back up to rewatch something</li>
+        <li>Basic device info (screen ratio, touch or mouse)</li>
+      </ul>
+      <div style="margin-top:12px;">The feed also <b style="color:var(--accent-2)">adapts in real time</b> — the longer you linger on a category, the more of it you will be served. At the end, your profile summary will be shown on the host's screen for the whole class to discuss.</div>
+    </div>
+    <label class="consent-check">
+      <input type="checkbox" id="consent-check">
+      <span>I understand what is being recorded, and I agree that my summary will be displayed on the host screen at the end of the session.</span>
+    </label>
+    <div class="error-txt" id="err-consent"></div>
+    <button class="primary-btn" id="btn-consent-continue">Enter Session</button>
+    <button class="ghost-btn" id="btn-consent-back" style="margin-top:8px;">Back</button>
+  </div>
+</div>
+
+<!-- ============ HOST LOBBY ============ -->
+<div id="screen-host" class="screen">
+  <div class="card room-code-card">
+    <div class="room-code-label">Room Code</div>
+    <div class="room-code" id="display-room-code">-----</div>
+    <div id="qrcode"></div>
+    <div class="join-hint" id="join-url-hint"></div>
+  </div>
+
+  <div class="card players-card">
+    <div class="players-header">
+      <h3><span class="live-dot"></span>Students</h3>
+      <span style="color:var(--accent-2);font-weight:700;" id="player-count">0</span>
+    </div>
+    <div class="player-chips" id="player-list"><span class="empty-note">Waiting for students to join…</span></div>
+  </div>
+
+  <div class="card settings-card">
+    <div class="settings-row">
+      <label for="range-timer">Session length</label>
+      <input type="range" id="range-timer" min="1" max="15" value="10">
+      <span id="timer-display" style="color:var(--accent-2);font-weight:600;min-width:52px;text-align:right;">10 min</span>
+    </div>
+    <div class="settings-row">
+      <label for="select-theme">Accent theme</label>
+      <select id="select-theme">
+        <option value="violet">Violet / Cyan</option>
+        <option value="ember">Ember / Gold</option>
+        <option value="mint">Mint / Lime</option>
+        <option value="rose">Rose / Magenta</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label for="select-adapt">Adaptive feed</label>
+      <select id="select-adapt">
+        <option value="on">On — feed reacts to watch time</option>
+        <option value="off">Off — fixed random order</option>
+      </select>
+    </div>
+    <button class="primary-btn" id="btn-start-session">Start Experience</button>
+    <button class="ghost-btn" id="btn-end-session" style="display:none;">End Session &amp; Show Report</button>
+  </div>
+
+  <div class="warn-banner" id="host-status-note">Share the code or QR above. Students must accept the data notice before they can join the feed.</div>
+</div>
+
+<!-- ============ WAITING ============ -->
+<div id="screen-waiting" class="screen">
+  <div class="spinner"></div>
+  <h2 style="margin:0 0 8px;">You're in</h2>
+  <p style="color:var(--text-dim);font-size:.92rem;">Room <b id="waiting-room-code" style="color:var(--accent-2)"></b> — waiting for the host to start.</p>
+</div>
+
+<!-- ============ FEED ============ -->
+<div id="screen-feed" class="screen">
+  <div class="feed-wrap">
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="feed-topbar"><div class="timer-pill" id="timer-pill">10:00</div></div>
+    <div class="feed-scroller" id="feed-scroller"></div>
+  </div>
+</div>
+
+<!-- ============ REPORT ============ -->
+<div id="screen-report" class="screen"></div>
+
+<script>
+/* =========================================================
+   1. FIREBASE CONFIG
+   NOTE: databaseURL must be the database endpoint, NOT the
+   console page URL. If your Realtime Database was created in
+   a European region, use the commented line instead.
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAse6AJljBNQ8sPYffU_XoQoSUknpApaqs",
+  authDomain: "algo-lab-d8c0d.firebaseapp.com",
+  databaseURL: "https://algo-lab-d8c0d-default-rtdb.firebaseio.com",
+  // databaseURL: "https://algo-lab-d8c0d-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "algo-lab-d8c0d",
+  storageBucket: "algo-lab-d8c0d.firebasestorage.app",
+  messagingSenderId: "326987320017",
+  appId: "1:326987320017:web:0706cb9f0093aa08ce53f0",
+  measurementId: "G-21DCHPHXPT"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* =========================================================
+   2. CONTENT POOL
+   Replace these IDs with Shorts you have vetted for your class.
+   Any YouTube video ID works; vertical Shorts look best.
+   Get an ID from a URL: youtube.com/shorts/XXXXXXXXXXX  →  "XXXXXXXXXXX"
+   ========================================================= */
+const CONTENT_POOL = [
+  { id:"tgbNymZ7vqY", category:"high-stimulation", title:"Fast-cut music clip" },
+  { id:"ZbZSe6N_BXs", category:"high-stimulation", title:"Upbeat performance" },
+  { id:"e-ORhEE9VVg", category:"high-stimulation", title:"High-energy montage" },
+  { id:"9bZkp7q19f0", category:"high-stimulation", title:"Viral dance" },
+  { id:"aqz-KE-bpKQ", category:"calm",             title:"Animated short" },
+  { id:"ScMzIvxBSi4", category:"calm",             title:"Slow scenic clip" },
+  { id:"iik25wqIuFo", category:"calm",             title:"Relaxing visuals" },
+  { id:"BHACKCNDMW8", category:"informational",    title:"Explainer clip" },
+  { id:"h6fcK_fRYaI", category:"informational",    title:"Science storytelling" },
+  { id:"Rk6_hdVMqlQ", category:"informational",    title:"Quick fact breakdown" },
+  { id:"kJQP7kiw5Fk", category:"social",           title:"Pop culture moment" },
+  { id:"OPf0YbXqDm0", category:"social",           title:"Trending social clip" }
+];
+const CATEGORIES = ["high-stimulation","calm","informational","social"];
+const CATEGORY_LABEL = {
+  "high-stimulation":"High-stimulation",
+  "calm":"Calm",
+  "informational":"Informational",
+  "social":"Social / trending"
+};
+const THEMES = {
+  violet:{a:"#7C5CFF", b:"#34E4EA"},
+  ember: {a:"#FF7A45", b:"#FFC845"},
+  mint:  {a:"#3DDC97", b:"#C6F135"},
+  rose:  {a:"#FF5C7A", b:"#C86DFF"}
+};
+
+/* =========================================================
+   3. STATE
+   ========================================================= */
+const ADMIN_PASSCODE = "4321";
+let ROLE = null, ROOM_CODE = null, NICKNAME = null, studentId = null;
+let sessionEndsAt = null, sessionStartedAt = null, sessionTimerHandle = null;
+let adaptiveMode = true;
+let reportShown = false;
+
+let telemetry = {};          // key -> per-item record
+let ytPlayers = {};          // key -> YT.Player
+let feedItems = [];          // ordered list of {key,id,category,title}
+let currentIndex = 0;
+let itemEnterTime = 0;
+let maxIndexReached = 0;
+let scrollBackCount = 0;
+let categoryDwell = { "high-stimulation":0, "calm":0, "informational":0, "social":0 };
+
+/* =========================================================
+   4. HELPERS
+   ========================================================= */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function roomRef(path=''){ return db.ref('rooms/'+ROOM_CODE+(path?'/'+path:'')); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function applyTheme(name){
+  const t = THEMES[name] || THEMES.violet;
+  document.documentElement.style.setProperty('--accent', t.a);
+  document.documentElement.style.setProperty('--accent-2', t.b);
+}
+function genRoomCode(){
+  const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out=''; for(let i=0;i<5;i++) out+=chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
+/* =========================================================
+   5. LANDING
+   ========================================================= */
+document.getElementById('btn-show-host').onclick=()=>{
+  document.getElementById('path-row').style.display='none';
+  document.getElementById('panel-host').classList.add('active');
+};
+document.getElementById('btn-show-join').onclick=()=>{
+  document.getElementById('path-row').style.display='none';
+  document.getElementById('panel-join').classList.add('active');
+};
+function resetLanding(){
+  document.getElementById('path-row').style.display='flex';
+  document.getElementById('panel-host').classList.remove('active');
+  document.getElementById('panel-join').classList.remove('active');
+  document.getElementById('err-host').textContent='';
+  document.getElementById('err-join').textContent='';
+}
+document.getElementById('btn-back-1').onclick=resetLanding;
+document.getElementById('btn-back-2').onclick=resetLanding;
+
+/* ---- Host creates room ---- */
+document.getElementById('btn-create-room').onclick = async ()=>{
+  const errEl = document.getElementById('err-host');
+  if(document.getElementById('input-passcode').value.trim() !== ADMIN_PASSCODE){
+    errEl.textContent='Incorrect teacher passcode.'; return;
+  }
+  errEl.textContent='Creating room…';
+  ROLE='host';
+  ROOM_CODE=genRoomCode();
+  try{
+    await roomRef().set({
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      status:'lobby', theme:'violet', timerMinutes:10, adaptive:true
+    });
+  }catch(e){
+    errEl.textContent='Database error: '+e.message; return;
+  }
+  errEl.textContent='';
+  document.getElementById('display-room-code').textContent=ROOM_CODE;
+  const joinUrl = location.href.split('#')[0] + '#join=' + ROOM_CODE;
+  document.getElementById('join-url-hint').textContent = joinUrl;
+  document.getElementById('qrcode').innerHTML='';
+  new QRCode(document.getElementById('qrcode'),{ text:joinUrl, width:150, height:150,
+    colorDark:'#0A0E16', colorLight:'#ffffff' });
+  showScreen('screen-host');
+  listenToPlayers();
+  listenHostStatus();
+};
+
+/* ---- Student joins ---- */
+let pendingJoin = null;
+document.getElementById('btn-join-room').onclick = async ()=>{
+  const nick=document.getElementById('input-nickname').value.trim();
+  const code=document.getElementById('input-roomcode').value.trim().toUpperCase();
+  const errEl=document.getElementById('err-join');
+  if(!nick || !code){ errEl.textContent='Enter both a nickname and a room code.'; return; }
+  errEl.textContent='Checking…';
+  let snap;
+  try{ snap = await db.ref('rooms/'+code).get(); }
+  catch(e){ errEl.textContent='Database error: '+e.message; return; }
+  if(!snap.exists()){ errEl.textContent='Room not found. Check the code.'; return; }
+  errEl.textContent='';
+  pendingJoin = { nick, code };
+  showScreen('screen-consent');
+};
+
+document.getElementById('btn-consent-back').onclick=()=>{ showScreen('screen-landing'); };
+document.getElementById('btn-consent-continue').onclick = async ()=>{
+  const errEl=document.getElementById('err-consent');
+  if(!document.getElementById('consent-check').checked){
+    errEl.textContent='Please tick the box to continue.'; return;
+  }
+  errEl.textContent='';
+  ROLE='student';
+  ROOM_CODE=pendingJoin.code;
+  NICKNAME=pendingJoin.nick;
+  studentId='stu_'+Math.random().toString(36).slice(2,9);
+  await roomRef('students/'+studentId).set({
+    name:NICKNAME, joinedAt: firebase.database.ServerValue.TIMESTAMP, consented:true
+  });
+  roomRef('students/'+studentId).onDisconnect().update({ online:false });
+  await roomRef('students/'+studentId).update({ online:true });
+  document.getElementById('waiting-room-code').textContent=ROOM_CODE;
+  showScreen('screen-waiting');
+  listenToRoomStatus();
+};
+
+/* ---- QR deep link ---- */
+window.addEventListener('load',()=>{
+  const m=location.hash.match(/join=([A-Z0-9]+)/i);
+  if(m){
+    document.getElementById('btn-show-join').click();
+    document.getElementById('input-roomcode').value=m[1].toUpperCase();
+  }
+});
+
+/* =========================================================
+   6. HOST LOBBY
+   ========================================================= */
+function listenToPlayers(){
+  roomRef('students').on('value',snap=>{
+    const data=snap.val()||{};
+    const list=Object.values(data);
+    document.getElementById('player-count').textContent=list.length;
+    const el=document.getElementById('player-list');
+    el.innerHTML = list.length
+      ? list.map(s=>`<span class="player-chip">${escapeHtml(s.name)}</span>`).join('')
+      : '<span class="empty-note">Waiting for students to join…</span>';
+  });
+}
+function listenHostStatus(){
+  roomRef('status').on('value',snap=>{
+    if(snap.val()==='ended' && ROLE==='host' && !reportShown){
+      reportShown=true;
+      buildHostReport();
+    }
+  });
+}
+
+document.getElementById('range-timer').oninput=e=>{
+  document.getElementById('timer-display').textContent=e.target.value+' min';
+};
+document.getElementById('range-timer').onchange=e=>{
+  roomRef().update({ timerMinutes: parseInt(e.target.value,10) });
+};
+document.getElementById('select-theme').onchange=e=>{
+  applyTheme(e.target.value);
+  roomRef().update({ theme:e.target.value });
+};
+document.getElementById('select-adapt').onchange=e=>{
+  roomRef().update({ adaptive: e.target.value==='on' });
+};
+
+document.getElementById('btn-start-session').onclick = async ()=>{
+  const minutes=parseInt(document.getElementById('range-timer').value,10);
+  const startedAt=Date.now();
+  await roomRef().update({
+    status:'running',
+    startedAt,
+    sessionEndsAt: startedAt + minutes*60000,
+    adaptive: document.getElementById('select-adapt').value==='on',
+    pool: CONTENT_POOL
+  });
+  document.getElementById('btn-start-session').style.display='none';
+  document.getElementById('btn-end-session').style.display='block';
+  document.getElementById('host-status-note').innerHTML =
+    'Session is live. Students are scrolling. End it early any time, or wait for the timer.';
+};
+document.getElementById('btn-end-session').onclick = async ()=>{
+  await roomRef().update({ status:'ended' });
+};
+
+/* =========================================================
+   7. STUDENT — WAIT FOR START
+   ========================================================= */
+function listenToRoomStatus(){
+  roomRef().on('value',snap=>{
+    const room=snap.val();
+    if(!room) return;
+    if(room.theme) applyTheme(room.theme);
+    if(room.status==='running' && !sessionEndsAt){
+      sessionEndsAt=room.sessionEndsAt;
+      sessionStartedAt=room.startedAt || Date.now();
+      adaptiveMode = room.adaptive !== false;
+      startFeed(room.pool || CONTENT_POOL);
+    }
+    if(room.status==='ended' && !reportShown){
+      reportShown=true;
+      finishSessionForStudent();
+    }
+  });
+}
+
+/* =========================================================
+   8. FEED + YOUTUBE PLAYER
+   ========================================================= */
+let ytReadyPromise=null;
+function loadYT(){
+  if(ytReadyPromise) return ytReadyPromise;
+  ytReadyPromise=new Promise(resolve=>{
+    if(window.YT && window.YT.Player) return resolve();
+    const tag=document.createElement('script');
+    tag.src="https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+    window.onYouTubeIframeAPIReady=()=>resolve();
+  });
+  return ytReadyPromise;
+}
+
+let POOL = CONTENT_POOL;
+
+/* Weighted pick: categories you dwell on longer get served more often. */
+function pickNextVideo(){
+  const recentIds = feedItems.slice(-4).map(f=>f.id);
+  let candidates = POOL.filter(v=>!recentIds.includes(v.id));
+  if(candidates.length===0) candidates = POOL.slice();
+
+  if(!adaptiveMode){
+    return candidates[Math.floor(Math.random()*candidates.length)];
+  }
+  const totalDwell = CATEGORIES.reduce((a,c)=>a+categoryDwell[c],0);
+  const weights = candidates.map(v=>{
+    const share = totalDwell>0 ? categoryDwell[v.category]/totalDwell : 0.25;
+    // base 1 keeps exploration alive; share amplifies preferred categories up to ~4x
+    return 1 + share*3;
+  });
+  const sum = weights.reduce((a,b)=>a+b,0);
+  let r = Math.random()*sum;
+  for(let i=0;i<candidates.length;i++){
+    r -= weights[i];
+    if(r<=0) return candidates[i];
+  }
+  return candidates[candidates.length-1];
+}
+
+function buildFeedItem(video, index){
+  const key = video.id+'__'+index;
+  telemetry[key]={
+    videoId:video.id, category:video.category, title:video.title,
+    watchMs:0, retentionPct:0, rewatches:0,
+    likes:0, saves:0, reposts:0, index
+  };
+  feedItems.push({ key, ...video });
+
+  const el=document.createElement('div');
+  el.className='feed-item';
+  el.dataset.key=key;
+  el.dataset.index=index;
+  el.innerHTML=`
+    <div class="yt-holder" id="yt-${key}"></div>
+    <div class="tap-shield" data-key="${key}"></div>
+    <div class="feed-overlay">
+      <div class="meta-strip">
+        <span class="cat-tag">${CATEGORY_LABEL[video.category]||video.category}</span>
+        <div class="meta-title">${escapeHtml(video.title||'')}</div>
+      </div>
+      <div class="action-rail">
+        <div>
+          <div class="action-btn like-btn" data-key="${key}">❤</div>
+          <div class="action-count" id="cnt-like-${key}">0</div>
+        </div>
+        <div>
+          <div class="action-btn save-btn" data-key="${key}">🔖</div>
+          <div class="action-count" id="cnt-save-${key}">0</div>
+        </div>
+        <div>
+          <div class="action-btn repost-btn" data-key="${key}">↻</div>
+          <div class="action-count" id="cnt-repost-${key}">0</div>
+        </div>
+      </div>
+      ${index===0?'<div class="swipe-hint">↑ swipe up for the next video</div>':''}
+    </div>`;
+  document.getElementById('feed-scroller').appendChild(el);
+
+  ytPlayers[key]=new YT.Player('yt-'+key,{
+    videoId: video.id,
+    playerVars:{ controls:0, modestbranding:1, rel:0, playsinline:1, fs:0, disablekb:1 },
+    events:{
+      onReady:(e)=>{
+        e.target.mute(); // browsers block autoplay with sound
+        if(index===0){ e.target.playVideo(); itemEnterTime=Date.now(); }
+      },
+      onStateChange:(e)=>{
+        if(e.data===YT.PlayerState.ENDED){
+          telemetry[key].rewatches++;
+          e.target.seekTo(0); e.target.playVideo();
+        }
+      }
+    }
+  });
+}
+
+async function startFeed(pool){
+  POOL = Array.isArray(pool)&&pool.length ? pool : CONTENT_POOL;
+  showScreen('screen-feed');
+  await loadYT();
+  const scroller=document.getElementById('feed-scroller');
+  scroller.innerHTML='';
+  feedItems=[]; telemetry={}; ytPlayers={};
+  currentIndex=0; maxIndexReached=0; scrollBackCount=0;
+  categoryDwell={ "high-stimulation":0,"calm":0,"informational":0,"social":0 };
+
+  // seed with 3 items, one from a different category each where possible
+  const seed=[];
+  CATEGORIES.forEach(c=>{
+    const opts=POOL.filter(v=>v.category===c);
+    if(opts.length) seed.push(opts[Math.floor(Math.random()*opts.length)]);
+  });
+  seed.sort(()=>Math.random()-0.5).slice(0,3).forEach((v,i)=>buildFeedItem(v,i));
+
+  itemEnterTime=Date.now();
+
+  scroller.addEventListener('click',onActionClick);
+  scroller.addEventListener('scroll',onFeedScroll,{passive:true});
+  runSessionTimer();
+}
+
+function onActionClick(e){
+  const btn=e.target.closest('.action-btn');
+  if(!btn) return;
+  const key=btn.dataset.key;
+  const t=telemetry[key];
+  if(!t) return;
+  if(btn.classList.contains('like-btn')){
+    const on=btn.classList.toggle('liked');
+    t.likes=Math.max(0,t.likes+(on?1:-1));
+    document.getElementById('cnt-like-'+key).textContent=t.likes;
+  }
+  if(btn.classList.contains('save-btn')){
+    const on=btn.classList.toggle('saved');
+    t.saves=Math.max(0,t.saves+(on?1:-1));
+    document.getElementById('cnt-save-'+key).textContent=t.saves;
+  }
+  if(btn.classList.contains('repost-btn')){
+    const on=btn.classList.toggle('reposted');
+    t.reposts=Math.max(0,t.reposts+(on?1:-1));
+    document.getElementById('cnt-repost-'+key).textContent=t.reposts;
+  }
+  // interactions are a strong preference signal — weight them into the feed
+  if(adaptiveMode) categoryDwell[t.category]+=2000;
+  pushTelemetry(key);
+}
+
+let scrollTimer=null;
+function onFeedScroll(){
+  clearTimeout(scrollTimer);
+  scrollTimer=setTimeout(handleSnapSettled,110);
+}
+
+function handleSnapSettled(){
+  const scroller=document.getElementById('feed-scroller');
+  const h=scroller.clientHeight;
+  if(!h) return;
+  const idx=Math.round(scroller.scrollTop/h);
+  if(idx===currentIndex) return;
+
+  // close out the item we just left
+  const prev=feedItems[currentIndex];
+  if(prev){
+    const dwell=Date.now()-itemEnterTime;
+    const t=telemetry[prev.key];
+    t.watchMs+=dwell;
+    categoryDwell[prev.category]+=dwell;
+    const p=ytPlayers[prev.key];
+    if(p && p.pauseVideo){
+      try{
+        const dur=p.getDuration();
+        if(dur>0) t.retentionPct=Math.min(100,Math.round((t.watchMs/1000/dur)*100));
+        p.pauseVideo();
+      }catch(err){}
+    }
+    pushTelemetry(prev.key);
+  }
+
+  if(idx<currentIndex) scrollBackCount++;
+  currentIndex=idx;
+  maxIndexReached=Math.max(maxIndexReached,idx);
+  itemEnterTime=Date.now();
+
+  const cur=feedItems[currentIndex];
+  if(cur){
+    const p=ytPlayers[cur.key];
+    if(p && p.playVideo){ try{ p.seekTo(0); p.playVideo(); }catch(err){} }
+  }
+
+  // infinite feed: keep two items buffered ahead, chosen adaptively
+  while(feedItems.length - currentIndex < 3){
+    buildFeedItem(pickNextVideo(), feedItems.length);
+  }
+}
+
+function pushTelemetry(key){
+  if(!ROOM_CODE || !studentId) return;
+  roomRef(`students/${studentId}/telemetry/${key}`).set(telemetry[key]).catch(()=>{});
+}
+
+function runSessionTimer(){
+  clearInterval(sessionTimerHandle);
+  const total=Math.max(1, sessionEndsAt - sessionStartedAt);
+  sessionTimerHandle=setInterval(()=>{
+    const remaining=sessionEndsAt-Date.now();
+    if(remaining<=0){
+      clearInterval(sessionTimerHandle);
+      document.getElementById('timer-pill').textContent='0:00';
+      document.getElementById('progress-fill').style.width='100%';
+      if(!reportShown){ reportShown=true; finishSessionForStudent(); }
+      return;
+    }
+    const m=Math.floor(remaining/60000), s=Math.floor((remaining%60000)/1000);
+    document.getElementById('timer-pill').textContent=`${m}:${String(s).padStart(2,'0')}`;
+    document.getElementById('progress-fill').style.width=
+      Math.min(100,((total-remaining)/total)*100)+'%';
+  },500);
+}
+
+/* =========================================================
+   9. STUDENT REPORT
+   ========================================================= */
+async function finishSessionForStudent(){
+  if(ROLE!=='student') return;
+  clearInterval(sessionTimerHandle);
+
+  // flush the item still on screen
+  const cur=feedItems[currentIndex];
+  if(cur){
+    const t=telemetry[cur.key];
+    const dwell=Date.now()-itemEnterTime;
+    t.watchMs+=dwell;
+    categoryDwell[cur.category]+=dwell;
+  }
+  Object.values(ytPlayers).forEach(p=>{ try{ p.pauseVideo(); }catch(e){} });
+  Object.keys(telemetry).forEach(pushTelemetry);
+
+  const recs=Object.values(telemetry).filter(t=>t.watchMs>0);
+  const totalWatched=recs.length;
+  const totalMs=recs.reduce((a,t)=>a+t.watchMs,0);
+  const avgAttention=totalWatched ? totalMs/1000/totalWatched : 0;
+  const likes=recs.reduce((a,t)=>a+t.likes,0);
+  const saves=recs.reduce((a,t)=>a+t.saves,0);
+  const reposts=recs.reduce((a,t)=>a+t.reposts,0);
+  const rewatches=recs.reduce((a,t)=>a+t.rewatches,0);
+  const interactions=likes+saves+reposts;
+  const interactionRatio=totalWatched ? +(interactions/totalWatched).toFixed(2) : 0;
+
+  // dominant category
+  let topCat=CATEGORIES[0], topMs=0;
+  CATEGORIES.forEach(c=>{ if(categoryDwell[c]>topMs){ topMs=categoryDwell[c]; topCat=c; } });
+  const topShare=totalMs ? Math.round((topMs/totalMs)*100) : 0;
+
+  const engagementIndex=Math.min(100, Math.round(
+    Math.min(avgAttention,15)*3 + interactions*6 + scrollBackCount*5 + rewatches*4
+  ));
+
+  const archetype=pickArchetype({avgAttention,interactionRatio,scrollBackCount,topCat,topShare,engagementIndex});
+
+  const summary={
+    name:NICKNAME, totalWatched, avgAttention:+avgAttention.toFixed(1),
+    likes, saves, reposts, rewatches, scrollBacks:scrollBackCount,
+    interactionRatio, engagementIndex,
+    archetype:archetype.name, topCat, topShare,
+    dwell:categoryDwell,
+    device:{
+      ratio:+(window.innerWidth/window.innerHeight).toFixed(2),
+      pointer: matchMedia('(pointer:coarse)').matches?'touch':'mouse'
+    },
+    finishedAt: firebase.database.ServerValue.TIMESTAMP
+  };
+  try{ await roomRef('students/'+studentId+'/summary').set(summary); }catch(e){}
+
+  renderStudentReport(summary, archetype);
+  showScreen('screen-report');
+}
+
+function pickArchetype({avgAttention,interactionRatio,scrollBackCount,topCat,topShare,engagementIndex}){
+  if(topCat==='high-stimulation' && topShare>45 && engagementIndex>50){
+    return { name:"Dopamine Chaser",
+      desc:"Your attention pulled hardest toward fast, high-stimulation clips — and the feed noticed within the first minute and started serving you more of exactly that." };
+  }
+  if(scrollBackCount>=3){
+    return { name:"The Rewinder",
+      desc:"You scrolled back up more than most. Going back is one of the strongest interest signals a platform can read — stronger than a like, because nobody does it by accident." };
+  }
+  if(avgAttention<3){
+    return { name:"Impulsive Skimmer",
+      desc:"You moved on quickly from almost everything. Real platforms respond to this by shortening and intensifying what they show you, trying to find the thing that makes you stop." };
+  }
+  if(interactionRatio>0.7){
+    return { name:"Active Signaller",
+      desc:"You tapped like, save and repost often. Every one of those taps hands the system a labelled data point about your taste — which is why those buttons are so easy to reach." };
+  }
+  if(topCat==='informational' && topShare>40){
+    return { name:"The Deep Diver",
+      desc:"Explanatory content held you longest. A recommender would read that as high tolerance for longer formats and start pushing you toward denser, longer videos." };
+  }
+  return { name:"Balanced Viewer",
+    desc:"No single pattern dominated your session — but the system is still building a profile from every second you gave it. Balanced just means it needs a bit more data." };
+}
+
+function renderStudentReport(s, archetype){
+  const el=document.getElementById('screen-report');
+  const dwellData=CATEGORIES.map(c=>Math.round((s.dwell[c]||0)/1000));
+  el.innerHTML=`
+    <div class="card archetype-card">
+      <div class="archetype-tag">YOUR DIGITAL FOOTPRINT</div>
+      <div class="archetype-name">${archetype.name}</div>
+      <div class="archetype-desc">${archetype.desc}</div>
+    </div>
+    <div class="stat-grid">
+      <div class="card stat-box"><div class="stat-value">${s.totalWatched}</div><div class="stat-label">Videos watched</div></div>
+      <div class="card stat-box"><div class="stat-value">${s.avgAttention}s</div><div class="stat-label">Avg. attention</div></div>
+      <div class="card stat-box"><div class="stat-value">${s.interactionRatio}</div><div class="stat-label">Interactions / video</div></div>
+      <div class="card stat-box"><div class="stat-value">${s.engagementIndex}</div><div class="stat-label">Engagement index</div></div>
+    </div>
+    <div class="card insight-card">
+      <h3>What the algorithm learned about you</h3>
+      <div class="insight-line">You spent <b>${s.topShare}%</b> of your total watch time on <b>${CATEGORY_LABEL[s.topCat]}</b> content. That is the single strongest signal in your profile, and the feed was already weighting toward it while you scrolled.</div>
+      <div class="insight-line">You gave <b>${s.likes}</b> likes, <b>${s.saves}</b> saves and <b>${s.reposts}</b> reposts. Saves and reposts usually count for more than likes, because they imply intent to return or to spread.</div>
+      <div class="insight-line">You scrolled back up <b>${s.scrollBacks}</b> times and re-looped a video <b>${s.rewatches}</b> times — deliberate rewatching is treated as a premium interest signal.</div>
+      <div class="insight-line">Your device reported a <b>${s.device.ratio}</b> screen ratio on a <b>${s.device.pointer}</b> interface. Real platforms use this to fingerprint device class and adjust what gets served.</div>
+    </div>
+    <div class="card chart-wrap"><canvas id="studentChart" height="200"></canvas></div>
+    <div class="card debrief">
+      <h3>The point of the exercise</h3>
+      This was a simplified model, but the mechanics are real. TikTok, Instagram Reels and YouTube Shorts all measure watch time per category, completion rate, rewatches, scroll-back, and every tap — then narrow what you see accordingly. The important part is not that the numbers above are flattering or alarming. It is that they were produced from a few minutes of ordinary scrolling, without you being asked a single question about what you like.
+    </div>
+    <p class="bottom-note">Educational simulation for media-literacy teaching. Data stays in this session's room and is not used for anything beyond the class discussion.</p>
+  `;
+  new Chart(document.getElementById('studentChart'),{
+    type:'bar',
+    data:{ labels:CATEGORIES.map(c=>CATEGORY_LABEL[c]),
+      datasets:[{ label:'Seconds watched', data:dwellData,
+        backgroundColor:['#7C5CFF','#34E4EA','#3DDC97','#FFB020'], borderRadius:8 }] },
+    options:{ plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#8892A6',font:{size:10}},grid:{display:false}},
+               y:{ticks:{color:'#8892A6'},grid:{color:'rgba(255,255,255,.06)'},beginAtZero:true} } }
+  });
+}
+
+/* =========================================================
+   10. HOST CLASS DASHBOARD
+   ========================================================= */
+async function buildHostReport(){
+  showScreen('screen-report');
+  const el=document.getElementById('screen-report');
+  el.innerHTML=`
+    <div class="card" style="padding:22px;text-align:center;">
+      <h2 style="margin:0 0 4px;">Class Debrief</h2>
+      <p style="color:var(--text-dim);margin:0;font-size:.85rem;" id="host-count">Collecting results…</p>
+    </div>
+    <div class="card chart-wrap"><canvas id="classChart" height="220"></canvas></div>
+    <div class="card chart-wrap"><canvas id="catChart" height="220"></canvas></div>
+    <div id="host-report-list"></div>
+    <div class="card debrief">
+      <h3>Discussion prompts</h3>
+      Whose engagement index came out highest, and does that match how they think they scroll?
+      Which category held the class's attention longest — and did anyone choose it deliberately?
+      If this app could shape the feed in five minutes, what can a platform do over five years?
+    </div>`;
+
+  let classChart=null, catChart=null;
+
+  roomRef('students').on('value',snap=>{
+    const students=snap.val()||{};
+    const rows=Object.values(students).filter(s=>s.summary).map(s=>s.summary);
+    const total=Object.keys(students).length;
+    document.getElementById('host-count').textContent=
+      `${rows.length} of ${total} students finished`;
+
+    const listEl=document.getElementById('host-report-list');
+    if(rows.length===0){
+      listEl.innerHTML='<p class="empty-note" style="text-align:center;padding:18px;">No results submitted yet…</p>';
+      return;
+    }
+    rows.sort((a,b)=>b.engagementIndex-a.engagementIndex);
+    listEl.innerHTML=rows.map(r=>`
+      <div class="card student-row">
+        <div>
+          <div class="name">${escapeHtml(r.name)}</div>
+          <div class="arche">${escapeHtml(r.archetype)} · ${r.topShare}% ${CATEGORY_LABEL[r.topCat]||''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:700;font-size:1.1rem;">${r.engagementIndex}</div>
+          <div style="font-size:.68rem;color:var(--text-dim);">engagement</div>
+        </div>
+      </div>`).join('');
+
+    if(classChart) classChart.destroy();
+    classChart=new Chart(document.getElementById('classChart'),{
+      type:'bar',
+      data:{ labels:rows.map(r=>r.name),
+        datasets:[{ label:'Engagement index', data:rows.map(r=>r.engagementIndex),
+          backgroundColor:'#7C5CFF', borderRadius:6 }] },
+      options:{ plugins:{legend:{display:false},title:{display:true,text:'Engagement index by student',color:'#E7ECF5'}},
+        scales:{ x:{ticks:{color:'#8892A6',font:{size:10}},grid:{display:false}},
+                 y:{ticks:{color:'#8892A6'},beginAtZero:true,max:100,grid:{color:'rgba(255,255,255,.06)'}} } }
+    });
+
+    const classDwell=CATEGORIES.map(c=>
+      Math.round(rows.reduce((a,r)=>a+((r.dwell&&r.dwell[c])||0),0)/1000));
+    if(catChart) catChart.destroy();
+    catChart=new Chart(document.getElementById('catChart'),{
+      type:'doughnut',
+      data:{ labels:CATEGORIES.map(c=>CATEGORY_LABEL[c]),
+        datasets:[{ data:classDwell,
+          backgroundColor:['#7C5CFF','#34E4EA','#3DDC97','#FFB020'], borderWidth:0 }] },
+      options:{ plugins:{ legend:{labels:{color:'#E7ECF5',font:{size:11}}},
+        title:{display:true,text:'Where the whole class spent its attention',color:'#E7ECF5'} } }
+    });
+  });
+}
+</script>
+</body>
+</html>
